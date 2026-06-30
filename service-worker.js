@@ -2,7 +2,7 @@
 //  Kaushal Kartavya — Service Worker  (v5)
 //  Network-first for the app HTML so updates always appear.
 // ============================================================
-const CACHE_NAME = 'kaushal-kartavya-v6';
+const CACHE_NAME = 'kaushal-kartavya-v8';
 const ASSETS = ['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install', event => {

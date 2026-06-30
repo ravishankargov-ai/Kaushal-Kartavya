@@ -1615,6 +1615,7 @@ function showReportOverlay(html, mode) {
     <button onclick="closeReportOverlay()" style="background:#fff;color:#10355e;border:none;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;">✕ Close</button>
     <span style="font-weight:600;font-size:14px;flex:1;">Kaushal Kartavya — Report</span>
     <button onclick="printReportFrame()" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;">🖨️ Print / PDF</button>
+    <button onclick="downloadReportDoc()" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;">⬇️ Word/Doc</button>
     <button onclick="copyReportText()" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;">📋 Copy</button>
   `;
 
@@ -1633,12 +1634,13 @@ function showReportOverlay(html, mode) {
   doc.write(html);
   doc.close();
 
-  // Helpful hint at top of report for Docs mode
+  // Make report text easily selectable + helpful hint for Docs mode
   if (mode === 'docs') {
     setTimeout(() => {
+      try { doc.body.style.webkitUserSelect = 'text'; doc.body.style.userSelect = 'text'; } catch(e){}
       const hint = doc.createElement('div');
-      hint.style.cssText = 'background:#fff8e1;border:1px solid #ffd700;color:#92400e;padding:10px 14px;font-size:12px;font-family:Arial,sans-serif;margin:0 0 12px 0;border-radius:6px;';
-      hint.innerHTML = '💡 To save as Google Doc: tap <b>📋 Copy</b> above, then open Google Docs and paste. &nbsp; To save as PDF: tap <b>🖨️ Print / PDF</b>.';
+      hint.style.cssText = 'background:#fff8e1;border:1px solid #ffd700;color:#92400e;padding:10px 14px;font-size:12px;font-family:Arial,sans-serif;margin:0 0 12px 0;border-radius:6px;line-height:1.6;';
+      hint.innerHTML = '💡 <b>On a PC:</b> tap <b>⬇️ Word/Doc</b> to download the report — open it in Word, or upload it to Google Drive and open with Google Docs.<br>🖨️ <b>For PDF:</b> tap <b>Print / PDF</b>. &nbsp; 📋 <b>Copy</b> also works — paste into a blank Doc (if empty, select the text below → Copy manually).';
       if (doc.body && doc.body.firstChild) doc.body.insertBefore(hint, doc.body.firstChild);
       else if (doc.body) doc.body.appendChild(hint);
     }, 100);
@@ -1658,23 +1660,73 @@ function printReportFrame() {
   }
 }
 
-function copyReportText() {
+// Download the report as a Word-compatible .doc file (opens in Word or uploads to Google Docs)
+function downloadReportDoc() {
   const frame = document.getElementById('reportFrame');
   if (!frame || !frame.contentWindow) return;
-  const body = frame.contentWindow.document.body;
+  const doc = frame.contentWindow.document;
+  // Remove the yellow hint box from the saved copy, if present
+  let html = doc.documentElement.outerHTML;
+  html = html.replace(/<div[^>]*background:#fff8e1[^>]*>[\s\S]*?<\/div>/, '');
+  // Wrap with Word-compatible header so Windows opens it in Word
+  const wordDoc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+    'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+    '<head><meta charset="utf-8"></head><body>' + (doc.body ? doc.body.innerHTML : html) + '</body></html>';
+  const blob = new Blob(['\ufeff', wordDoc], {type:'application/msword'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Kaushal_Kartavya_Report_' + today() + '.doc';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function copyReportText() {
+  const frame = document.getElementById('reportFrame');
+  if (!frame || !frame.contentWindow) return;
+  const doc = frame.contentWindow.document;
+  const body = doc.body;
   if (!body) return;
-  // Select the report content
-  const range = frame.contentWindow.document.createRange();
-  range.selectNodeContents(body);
-  const sel = frame.contentWindow.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
+
+  // Build both plain-text and HTML versions of the report
+  const htmlText = body.innerHTML;
+  const plainText = (body.innerText || body.textContent || '').trim();
+
+  // Method 1: Modern async Clipboard API with rich HTML (best for Google Docs)
   try {
-    frame.contentWindow.document.execCommand('copy');
+    if (navigator.clipboard && window.ClipboardItem) {
+      const item = new ClipboardItem({
+        'text/html': new Blob([htmlText], {type:'text/html'}),
+        'text/plain': new Blob([plainText], {type:'text/plain'})
+      });
+      await navigator.clipboard.write([item]);
+      alert('✓ Report copied!\n\nNow open Google Docs → tap in the document → long-press → Paste.');
+      return;
+    }
+  } catch(e) { /* fall through */ }
+
+  // Method 2: Plain-text clipboard
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(plainText);
+      alert('✓ Report copied as text!\n\nOpen Google Docs → long-press → Paste.');
+      return;
+    }
+  } catch(e) { /* fall through */ }
+
+  // Method 3: Manual selection fallback — select the text so user taps Copy
+  try {
+    const range = doc.createRange();
+    range.selectNodeContents(body);
+    const sel = frame.contentWindow.getSelection();
     sel.removeAllRanges();
-    alert('Report copied! Now open Google Docs and paste (long-press → Paste).');
+    sel.addRange(range);
+    doc.execCommand('copy');
+    alert('The report text is now selected.\n\nIf nothing pastes, long-press the highlighted text → Copy, then paste into Google Docs.');
   } catch(e) {
-    alert('Could not auto-copy. Please long-press the report text, Select All, then Copy.');
+    alert('Please long-press the report text, choose Select All → Copy, then paste into Google Docs.');
   }
 }
 
