@@ -845,7 +845,7 @@
   </div>
 </div>
 
-<!-- ── Identity ("Who am I") Modal ── -->
+<!-- ── Identity ("Who am I") + PIN Modal ── -->
 <div class="modal-overlay" id="identityModalOverlay">
   <div class="modal" style="max-width:440px;">
     <div class="modal-header">
@@ -854,19 +854,143 @@
     </div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--ink-muted);line-height:1.6;margin:0 0 12px;">
-        Select your designation. This identifies you as the officer operating this device, so the app knows which tasks are yours to manage. You can change this later from the header.
+        Select your designation, then enter your PIN. This identifies you as the officer on this device, so only you can manage your own tasks.
       </p>
       <div id="identityForcedNote" style="display:none;background:#fff8e1;border:1px solid #ffd700;color:#92400e;padding:9px 12px;border-radius:6px;font-size:12px;line-height:1.6;margin-bottom:12px;">
-        Please set who you are before adding a task. Only the officer who adds a task can later edit or complete it.
+        Please identify yourself before adding a task. Only the officer who adds a task can later edit or complete it.
       </div>
       <div class="form-group">
         <label class="form-label">My Designation *</label>
-        <select class="form-select" id="identitySelect"></select>
+        <select class="form-select" id="identitySelect" onchange="onIdentitySelectChange()"></select>
       </div>
+
+      <!-- PIN entry (existing PIN) -->
+      <div class="form-group" id="pinEntryRow" style="display:none;">
+        <label class="form-label">Enter your PIN *</label>
+        <input class="form-input" id="pinEntry" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="4–6 digit PIN">
+      </div>
+
+      <!-- PIN creation (first time) -->
+      <div id="pinCreateBlock" style="display:none;">
+        <div style="background:#eff6ff;border:1px solid #bcd7f5;color:#1e3a5f;padding:9px 12px;border-radius:6px;font-size:12px;line-height:1.6;margin-bottom:10px;">
+          🔐 First time for this designation. Create a PIN (4–6 digits). You'll need it whenever you identify yourself on any device. Keep it private.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Create PIN *</label>
+          <input class="form-input" id="pinNew1" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="4–6 digits">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm PIN *</label>
+          <input class="form-input" id="pinNew2" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Re-enter PIN">
+        </div>
+      </div>
+
       <div id="identityMsg" style="color:var(--overdue);font-size:12px;margin-top:8px;"></div>
+
+      <div style="margin-top:14px;border-top:1px solid var(--border-light);padding-top:10px;">
+        <button class="btn btn-ghost btn-sm" style="font-size:12px;" onclick="openAdminModal()">🛡️ Admin / Supervisor</button>
+        <span style="font-size:11px;color:var(--ink-muted);">— unlock or reassign tasks, reset a PIN</span>
+      </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-accent" onclick="saveIdentity()">Save</button>
+      <button class="btn btn-accent" id="identitySaveBtn" onclick="saveIdentity()">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Admin / Supervisor Modal ── -->
+<div class="modal-overlay" id="adminModalOverlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h3>🛡️ Admin / Supervisor</h3>
+      <button class="icon-btn" onclick="closeAdminModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Step 1: master PIN login -->
+      <div id="adminLoginBlock">
+        <p style="font-size:13px;color:var(--ink-muted);line-height:1.6;margin:0 0 12px;">
+          Enter the master PIN to manage officers and tasks.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Master PIN *</label>
+          <input class="form-input" id="adminPin" type="password" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="Master PIN">
+        </div>
+        <div id="adminLoginMsg" style="color:var(--overdue);font-size:12px;margin-top:6px;"></div>
+        <div class="modal-footer" style="padding:14px 0 0;">
+          <button class="btn btn-accent" onclick="adminLogin()">Unlock Admin</button>
+        </div>
+      </div>
+
+      <!-- Step 2: forced master PIN change (first use) -->
+      <div id="adminChangeBlock" style="display:none;">
+        <div style="background:#fff8e1;border:1px solid #ffd700;color:#92400e;padding:9px 12px;border-radius:6px;font-size:12px;line-height:1.6;margin-bottom:12px;">
+          ⚠️ This is the first Admin login. You must set a new master PIN now. The placeholder PIN will stop working.
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Master PIN *</label>
+          <input class="form-input" id="adminNew1" type="password" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="4–12 digits">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Master PIN *</label>
+          <input class="form-input" id="adminNew2" type="password" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="Re-enter">
+        </div>
+        <div id="adminChangeMsg" style="color:var(--overdue);font-size:12px;margin-top:6px;"></div>
+        <div class="modal-footer" style="padding:14px 0 0;">
+          <button class="btn btn-accent" onclick="adminSetMaster()">Set Master PIN</button>
+        </div>
+      </div>
+
+      <!-- Step 3: admin actions -->
+      <div id="adminPanelBlock" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" id="adminTabReset" onclick="adminShowTab('reset')">🔁 Reset a PIN</button>
+          <button class="btn btn-ghost btn-sm" id="adminTabReassign" onclick="adminShowTab('reassign')">↪️ Reassign a Task</button>
+          <button class="btn btn-ghost btn-sm" id="adminTabMaster" onclick="adminShowTab('master')">🔑 Change Master PIN</button>
+        </div>
+
+        <!-- Reset a PIN -->
+        <div id="adminResetTab">
+          <p style="font-size:12px;color:var(--ink-muted);line-height:1.6;margin:0 0 10px;">
+            Clear an officer's PIN. They'll set a new one next time they identify themselves. Their tasks stay theirs.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Officer</label>
+            <select class="form-select" id="adminResetOfficer"></select>
+          </div>
+          <button class="btn btn-accent btn-sm" onclick="adminResetPin()">Reset this officer's PIN</button>
+        </div>
+
+        <!-- Reassign a task -->
+        <div id="adminReassignTab" style="display:none;">
+          <p style="font-size:12px;color:var(--ink-muted);line-height:1.6;margin:0 0 10px;">
+            Move a task to a different owner (e.g. when an officer is transferred).
+          </p>
+          <div class="form-group">
+            <label class="form-label">Task</label>
+            <select class="form-select" id="adminReassignTask"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Owner</label>
+            <select class="form-select" id="adminReassignOwner"></select>
+          </div>
+          <button class="btn btn-accent btn-sm" onclick="adminReassignTask()">Reassign task</button>
+        </div>
+
+        <!-- Change master PIN -->
+        <div id="adminMasterTab" style="display:none;">
+          <div class="form-group">
+            <label class="form-label">New Master PIN *</label>
+            <input class="form-input" id="adminChgNew1" type="password" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="4–12 digits">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm *</label>
+            <input class="form-input" id="adminChgNew2" type="password" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="Re-enter">
+          </div>
+          <button class="btn btn-accent btn-sm" onclick="adminChangeMaster()">Update Master PIN</button>
+        </div>
+
+        <div id="adminActionMsg" style="font-size:12px;margin-top:12px;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1049,6 +1173,7 @@ window.onload = function() {
   scriptUrl = localStorage.getItem(URL_KEY) || '';
   isOffline = localStorage.getItem(OFFLINE_KEY) === '1';
   myIdentity = getIdentity();
+  myPinHash = localStorage.getItem(IDENTITY_KEY+'_h') || '';
   if (scriptUrl || isOffline) launchApp();
 };
 
@@ -1142,7 +1267,7 @@ async function pushTask(task) {
   if (isOffline) { saveLocal(tasks); return; }
   setSyncBadge('saving', 'Saving…');
   try {
-    const data = await gasRequest({ action:'saveTask', payload: JSON.stringify(task) });
+    const data = await gasRequest({ action:'saveTask', payload: JSON.stringify(task), actor: myIdentity, actorHash: myPinHash });
     if (data.error) throw new Error(data.error);
     saveLocal(tasks);
     setSyncBadge('ok', 'Saved ✓');
@@ -1157,7 +1282,7 @@ async function pushDelete(id) {
   if (isOffline) { saveLocal(tasks); return; }
   setSyncBadge('saving', 'Deleting…');
   try {
-    const data = await gasRequest({ action:'deleteTask', id });
+    const data = await gasRequest({ action:'deleteTask', id, actor: myIdentity, actorHash: myPinHash });
     if (data.error) throw new Error(data.error);
     saveLocal(tasks);
     setSyncBadge('ok', 'Live');
@@ -1626,23 +1751,224 @@ function canEdit(t){
   if(!t.owner) return true;          // legacy tasks with no owner stay editable by all
   return t.owner === myIdentity;     // only the owner may edit / complete / delete
 }
-// Open the "who am I" chooser. If forced, user cannot dismiss without picking.
+
+// ── PIN crypto (SHA-256; plain PIN never leaves the device) ────
+const PIN_SALT = 'UKSDS-Kaushal-2026-salt-v1';
+async function hashPin(officer, pin){
+  const enc = new TextEncoder();
+  const data = enc.encode(PIN_SALT + '::' + officer + '::' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function validPinFormat(p){ return /^[0-9]{4,6}$/.test(p); }
+
+// Credentials metadata cache: { officersWithPin:[...], adminMustChange:bool }
+let credMeta = { officersWithPin: [], adminMustChange: true };
+let myPinHash = '';   // the current identity's verified hash, kept in memory for backend writes
+
+async function loadCredMeta(){
+  if(isOffline) return credMeta;
+  try{
+    const d = await gasRequest({ action:'getCredMeta' });
+    if(d && !d.error){ credMeta = { officersWithPin: d.officersWithPin||[], adminMustChange: !!d.adminMustChange }; }
+  }catch(e){}
+  return credMeta;
+}
+
+// ── Identity modal flow ───────────────────────────────────────
 function openIdentityModal(forced){
   const sel = document.getElementById('identitySelect');
-  sel.innerHTML = officerOptionsHtml(myIdentity);
+  sel.innerHTML = officerOptionsHtml('');
   document.getElementById('identityForcedNote').style.display = forced ? 'block' : 'none';
   document.getElementById('identityCancelBtn').style.display = forced ? 'none' : 'inline-block';
   document.getElementById('identityMsg').textContent = '';
+  document.getElementById('pinEntry').value='';
+  document.getElementById('pinNew1').value='';
+  document.getElementById('pinNew2').value='';
+  document.getElementById('pinEntryRow').style.display='none';
+  document.getElementById('pinCreateBlock').style.display='none';
+  loadCredMeta().then(()=>{ /* meta ready for onIdentitySelectChange */ });
   document.getElementById('identityModalOverlay').classList.add('open');
 }
 function closeIdentityModal(){ document.getElementById('identityModalOverlay').classList.remove('open'); }
-function saveIdentity(){
+
+// When designation chosen, decide: ask for existing PIN, or create a new one
+function onIdentitySelectChange(){
   const v = document.getElementById('identitySelect').value;
-  if(!v){ document.getElementById('identityMsg').textContent = 'Please select your designation to continue.'; return; }
-  document.getElementById('identityMsg').textContent = '';
-  setIdentity(v);
-  closeIdentityModal();
-  renderTasks();
+  const entryRow = document.getElementById('pinEntryRow');
+  const createBlk = document.getElementById('pinCreateBlock');
+  document.getElementById('identityMsg').textContent='';
+  if(!v){ entryRow.style.display='none'; createBlk.style.display='none'; return; }
+  const hasPin = credMeta.officersWithPin.indexOf(v) !== -1;
+  if(hasPin){ entryRow.style.display='block'; createBlk.style.display='none'; }
+  else { entryRow.style.display='none'; createBlk.style.display='block'; }
+}
+
+async function saveIdentity(){
+  const v = document.getElementById('identitySelect').value;
+  const msg = document.getElementById('identityMsg');
+  if(!v){ msg.textContent='Please select your designation.'; return; }
+
+  const hasPin = credMeta.officersWithPin.indexOf(v) !== -1;
+  const btn = document.getElementById('identitySaveBtn');
+  btn.disabled = true;
+
+  try{
+    if(hasPin){
+      // Verify existing PIN
+      const pin = document.getElementById('pinEntry').value.trim();
+      if(!validPinFormat(pin)){ msg.textContent='Enter your 4–6 digit PIN.'; btn.disabled=false; return; }
+      const h = await hashPin(v, pin);
+      const res = await gasRequest({ action:'verifyPin', officer:v, hash:h });
+      if(!res || !res.ok){ msg.textContent='Incorrect PIN. Try again, or ask Admin to reset it.'; btn.disabled=false; return; }
+      myPinHash = h;
+    } else {
+      // Create a new PIN
+      const p1 = document.getElementById('pinNew1').value.trim();
+      const p2 = document.getElementById('pinNew2').value.trim();
+      if(!validPinFormat(p1)){ msg.textContent='PIN must be 4–6 digits.'; btn.disabled=false; return; }
+      if(p1!==p2){ msg.textContent='The two PINs do not match.'; btn.disabled=false; return; }
+      const h = await hashPin(v, p1);
+      const res = await gasRequest({ action:'setPin', officer:v, hash:h });
+      if(!res || !res.ok){
+        msg.textContent = (res && res.error==='exists')
+          ? 'A PIN already exists for this designation. Enter it instead, or ask Admin to reset.'
+          : 'Could not save PIN. Check connection and try again.';
+        btn.disabled=false;
+        await loadCredMeta(); onIdentitySelectChange();
+        return;
+      }
+      myPinHash = h;
+      if(credMeta.officersWithPin.indexOf(v)===-1) credMeta.officersWithPin.push(v);
+    }
+    setIdentity(v);
+    localStorage.setItem(IDENTITY_KEY+'_h', myPinHash);   // remember hash on this device
+    closeIdentityModal();
+    renderTasks();
+  }catch(e){
+    msg.textContent='Network error. Please try again.';
+  }
+  btn.disabled=false;
+}
+
+// ── Admin / Supervisor ────────────────────────────────────────
+let adminMasterHash = '';   // verified master hash, in memory during admin session
+const ADMIN_SALT = 'UKSDS-Kaushal-ADMIN-2026';
+async function hashMaster(pin){
+  const enc = new TextEncoder();
+  const data = enc.encode(ADMIN_SALT + '::MASTER::' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function openAdminModal(){
+  document.getElementById('adminLoginBlock').style.display='block';
+  document.getElementById('adminChangeBlock').style.display='none';
+  document.getElementById('adminPanelBlock').style.display='none';
+  document.getElementById('adminPin').value='';
+  document.getElementById('adminLoginMsg').textContent='';
+  document.getElementById('adminModalOverlay').classList.add('open');
+}
+function closeAdminModal(){ document.getElementById('adminModalOverlay').classList.remove('open'); }
+
+async function adminLogin(){
+  const pin = document.getElementById('adminPin').value.trim();
+  const msg = document.getElementById('adminLoginMsg');
+  if(!pin){ msg.textContent='Enter the master PIN.'; return; }
+  const h = await hashMaster(pin);
+  try{
+    const res = await gasRequest({ action:'adminVerify', hash:h });
+    if(!res || !res.ok){ msg.textContent='Incorrect master PIN.'; return; }
+    adminMasterHash = h;
+    if(res.mustChange){
+      document.getElementById('adminLoginBlock').style.display='none';
+      document.getElementById('adminChangeBlock').style.display='block';
+    } else {
+      enterAdminPanel();
+    }
+  }catch(e){ msg.textContent='Network error. Try again.'; }
+}
+
+async function adminSetMaster(){
+  const p1 = document.getElementById('adminNew1').value.trim();
+  const p2 = document.getElementById('adminNew2').value.trim();
+  const msg = document.getElementById('adminChangeMsg');
+  if(!/^[0-9]{4,12}$/.test(p1)){ msg.textContent='Master PIN must be 4–12 digits.'; return; }
+  if(p1!==p2){ msg.textContent='PINs do not match.'; return; }
+  const newHash = await hashMaster(p1);
+  try{
+    const res = await gasRequest({ action:'adminSetMaster', oldHash:adminMasterHash, newHash:newHash });
+    if(!res || !res.ok){ msg.textContent='Could not update master PIN.'; return; }
+    adminMasterHash = newHash;
+    enterAdminPanel();
+  }catch(e){ msg.textContent='Network error. Try again.'; }
+}
+
+function enterAdminPanel(){
+  document.getElementById('adminLoginBlock').style.display='none';
+  document.getElementById('adminChangeBlock').style.display='none';
+  document.getElementById('adminPanelBlock').style.display='block';
+  // populate officer reset list (only those with PINs)
+  const ro = document.getElementById('adminResetOfficer');
+  ro.innerHTML = credMeta.officersWithPin.length
+    ? credMeta.officersWithPin.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('')
+    : '<option value="">(no PINs set yet)</option>';
+  // populate reassign task + owner lists
+  const rt = document.getElementById('adminReassignTask');
+  rt.innerHTML = tasks.length
+    ? tasks.map(t=>`<option value="${esc(t.id)}">${esc((t.title||'').slice(0,50))} — ${esc(t.owner||'unowned')}</option>`).join('')
+    : '<option value="">(no tasks)</option>';
+  document.getElementById('adminReassignOwner').innerHTML = officerOptionsHtml('');
+  adminShowTab('reset');
+}
+function adminShowTab(which){
+  document.getElementById('adminResetTab').style.display = which==='reset'?'block':'none';
+  document.getElementById('adminReassignTab').style.display = which==='reassign'?'block':'none';
+  document.getElementById('adminMasterTab').style.display = which==='master'?'block':'none';
+  document.getElementById('adminActionMsg').textContent='';
+}
+function adminMsg(text, ok){
+  const m = document.getElementById('adminActionMsg');
+  m.style.color = ok ? 'var(--done)' : 'var(--overdue)';
+  m.textContent = text;
+}
+async function adminResetPin(){
+  const officer = document.getElementById('adminResetOfficer').value;
+  if(!officer){ adminMsg('No officer selected.', false); return; }
+  if(!confirm('Reset PIN for "'+officer+'"? They will set a new PIN next time they identify themselves.')) return;
+  try{
+    const res = await gasRequest({ action:'adminResetPin', masterHash:adminMasterHash, officer:officer });
+    if(!res || !res.ok){ adminMsg('Reset failed.', false); return; }
+    adminMsg('PIN reset for '+officer+'. They can now set a new PIN.', true);
+    await loadCredMeta();
+    enterAdminPanel(); adminShowTab('reset');
+  }catch(e){ adminMsg('Network error.', false); }
+}
+async function adminReassignTask(){
+  const taskId = document.getElementById('adminReassignTask').value;
+  const newOwner = document.getElementById('adminReassignOwner').value;
+  if(!taskId){ adminMsg('No task selected.', false); return; }
+  if(!newOwner){ adminMsg('Choose a new owner.', false); return; }
+  try{
+    const res = await gasRequest({ action:'adminReassign', masterHash:adminMasterHash, id:taskId, newOwner:newOwner });
+    if(!res || !res.ok){ adminMsg('Reassign failed.', false); return; }
+    adminMsg('Task reassigned to '+newOwner+'.', true);
+    await refreshTasks();
+    enterAdminPanel(); adminShowTab('reassign');
+  }catch(e){ adminMsg('Network error.', false); }
+}
+async function adminChangeMaster(){
+  const p1 = document.getElementById('adminChgNew1').value.trim();
+  const p2 = document.getElementById('adminChgNew2').value.trim();
+  if(!/^[0-9]{4,12}$/.test(p1)){ adminMsg('Master PIN must be 4–12 digits.', false); return; }
+  if(p1!==p2){ adminMsg('PINs do not match.', false); return; }
+  const newHash = await hashMaster(p1);
+  try{
+    const res = await gasRequest({ action:'adminSetMaster', oldHash:adminMasterHash, newHash:newHash });
+    if(!res || !res.ok){ adminMsg('Update failed.', false); return; }
+    adminMasterHash = newHash;
+    document.getElementById('adminChgNew1').value=''; document.getElementById('adminChgNew2').value='';
+    adminMsg('Master PIN updated.', true);
+  }catch(e){ adminMsg('Network error.', false); }
 }
 
 // Populate officer filter in toolbar from actual task data
